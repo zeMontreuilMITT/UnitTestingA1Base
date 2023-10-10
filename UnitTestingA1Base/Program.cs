@@ -10,7 +10,7 @@ app.UseHttpsRedirection();
 
 // Application Storage persists for single session
 AppStorage appStorage = new AppStorage();
-BusinessLogicLayer bll = new BusinessLogicLayer(appStorage);    
+BusinessLogicLayer bll = new BusinessLogicLayer(appStorage);
 #endregion
 
 
@@ -18,8 +18,17 @@ BusinessLogicLayer bll = new BusinessLogicLayer(appStorage);
 
 /*
  * All methods should return a NotFound response code if a search using a Primary Key does not find any results.
- * 
- * Otherwise, the method should return an empty collection of the resource indicated in the root directory of the request.
+  */
+
+app.Map("/404", context =>
+{
+    context.Response.StatusCode = 404;
+    return context.Response.WriteAsync("404 - Resource not found");
+});
+
+
+/*
+* Otherwise, the method should return an empty collection of the resource indicated in the root directory of the request.
  * 
  * All methods with a name and id parameter can use either. 
  * 
@@ -31,32 +40,93 @@ BusinessLogicLayer bll = new BusinessLogicLayer(appStorage);
 ///<summary>
 /// Returns a HashSet of all Recipes that contain the specified Ingredient by name or Primary Key
 /// </summary>
-app.MapGet("/recipes/byIngredient", (string? name, int? id) =>
+app.MapGet("/recipes/byIngredient", (int? id, string? name) =>
 {
-    try 
+    try
     {
-        HashSet<Recipe> recipes = bll.GetRecipesByIngredient(id, name);
+        HashSet<Recipe> recipes = bll.GetRecipesByIngredients(id, name);
+        
         return Results.Ok(recipes);
-    } catch(Exception ex)
+    }
+    catch (ArgumentNullException ex)
     {
-        return Results.NotFound();
+        return Results.NotFound(ex.Message);
+    }
+    catch (ArgumentOutOfRangeException ex)
+    {
+        return Results.NotFound(ex.Message);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Problem(ex.Message);
+    }
+    catch (Exception ex)
+    {
+        return Results.NotFound(ex.Message);
     }
 });
 
 ///<summary>
 /// Returns a HashSet of all Recipes that only contain ingredients that belong to the Dietary Restriction provided by name or Primary Key
 /// </summary>
-app.MapGet("/recipes/byDiet", (string name, int id) =>
+///recipes/byDiet?name=Vegan (exapmle)
+///
+///
+app.MapGet("/recipes/byDiet", (int? id, string? name) =>
 {
+    try
+    {
+        HashSet<Recipe> recipes = bll.GetRecipesByDietary(id, name);
 
+        return Results.Ok(recipes);
+    }
+    catch (ArgumentNullException ex)
+    {
+        return Results.NotFound(ex.Message);
+    }
+    catch (ArgumentOutOfRangeException ex)
+    {
+        return Results.NotFound(ex.Message);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Problem(ex.Message);
+    }
+    catch (Exception ex)
+    {
+        return Results.NotFound(ex.Message);
+    }
 });
+
+
 
 ///<summary>
 ///Returns a HashSet of all recipes by either Name or Primary Key. 
 /// </summary>
-app.MapGet("/recipes", (string name, int id) =>
+app.MapGet("/recipes", (int? id, string? name) =>
 {
+    try
+    {
+        HashSet<Recipe> recipes = bll.GetRecipes(id, name);
 
+        return Results.Ok(recipes);
+    }
+    catch (ArgumentNullException ex)
+    {
+        return Results.NotFound(ex.Message);
+    }
+    catch (ArgumentOutOfRangeException ex)
+    {
+        return Results.NotFound(ex.Message);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.NotFound(ex.Message);
+    }
+    catch (Exception ex)
+    {
+        return Results.NotFound(ex.Message);
+    }
 });
 
 ///<summary>
@@ -72,8 +142,42 @@ app.MapGet("/recipes", (string name, int id) =>
 /// 
 /// All IDs should be created for these objects using the returned value of the AppStorage.GeneratePrimaryKey() method
 /// </summary>
-app.MapPost("/recipes", () => {
+app.MapPost("/recipes", (RecipeSubmission submission) =>
+{
+    if (submission == null || submission.Recipe == null || submission.Ingredients == null || !submission.Ingredients.Any())
+        return Results.BadRequest("Invalid input.");
 
+    // Check if a recipe with the same name already exists
+    if (appStorage.Recipes.Any(r => r.Name.Equals(submission.Recipe.Name, StringComparison.OrdinalIgnoreCase)))
+        throw new InvalidOperationException("A recipe with the same name already exists.");
+
+    submission.Recipe.Id = appStorage.GeneratePrimaryKey();
+    appStorage.Recipes.Add(submission.Recipe);
+
+    foreach (var ingredient in submission.Ingredients)
+    {
+        var existingIngredient = appStorage.Ingredients.FirstOrDefault(i => i.Name.Equals(ingredient.Name, StringComparison.OrdinalIgnoreCase));
+
+        if (existingIngredient == null)
+        {
+            ingredient.Id = appStorage.GeneratePrimaryKey();
+            appStorage.Ingredients.Add(ingredient);
+        }
+        else
+        {
+            ingredient.Id = existingIngredient.Id;
+        }
+
+        var recipeIngredient = new RecipeIngredient
+        {
+            RecipeId = submission.Recipe.Id,
+            IngredientId = ingredient.Id
+            // Set any other required properties for RecipeIngredient here
+        };
+        appStorage.RecipeIngredients.Add(recipeIngredient);
+    }
+
+    return Results.Ok(submission.Recipe);
 });
 
 ///<summary>
