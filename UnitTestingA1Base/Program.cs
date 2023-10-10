@@ -48,7 +48,15 @@ app.MapGet("/recipes/byIngredient", (string? name, int? id) =>
 /// </summary>
 app.MapGet("/recipes/byDiet", (string name, int id) =>
 {
-
+    try
+    {
+        HashSet<Recipe> recipes = bll.GetRecipesByDiet(name, id);
+        return recipes.Any() ? Results.Ok(recipes) : Results.NotFound();
+    }
+    catch (Exception ex)
+    {
+        return Results.NotFound();
+    }
 });
 
 ///<summary>
@@ -56,7 +64,15 @@ app.MapGet("/recipes/byDiet", (string name, int id) =>
 /// </summary>
 app.MapGet("/recipes", (string name, int id) =>
 {
-
+    try
+    {
+        HashSet<Recipe> recipes = bll.GetRecipesByNameOrId(name, id);
+        return recipes.Any() ? Results.Ok(recipes) : Results.NotFound();
+    }
+    catch (Exception ex)
+    {
+        return Results.NotFound();
+    }
 });
 
 ///<summary>
@@ -72,9 +88,28 @@ app.MapGet("/recipes", (string name, int id) =>
 /// 
 /// All IDs should be created for these objects using the returned value of the AppStorage.GeneratePrimaryKey() method
 /// </summary>
-app.MapPost("/recipes", () => {
+// /recipes endpoint
+app.MapGet("/recipes", (string name, int id) =>
+{
+    try
+    {
+        HashSet<Recipe> matchingRecipes = bll.GetRecipesByNameOrId(name, id);
 
+        if (matchingRecipes.Count > 0)
+        {
+            return Results.Ok(matchingRecipes);
+        }
+        else
+        {
+            return Results.NotFound("No matching recipes found.");
+        }
+    }
+    catch (Exception ex)
+    {
+        return Results.NotFound();
+    }
 });
+
 
 ///<summary>
 /// Deletes an ingredient from the database. 
@@ -83,7 +118,22 @@ app.MapPost("/recipes", () => {
 ///</summary>
 app.MapDelete("/ingredients", (int id, string name) =>
 {
-
+    try
+    {
+        bool deleted = bll.DeleteIngredient(id, name);
+        if (deleted)
+        {
+            return Results.NoContent(); // Return a 204 No Content response on successful deletion
+        }
+        else
+        {
+            return Results.NotFound("Ingredient not found."); // Return a 404 Not Found response with an appropriate message
+        }
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(ex.Message); // Return a 400 Bad Request response with the exception message
+    }
 });
 
 /// <summary>
@@ -92,8 +142,24 @@ app.MapDelete("/ingredients", (int id, string name) =>
 /// </summary>
 app.MapDelete("/recipes", (int id, string name) =>
 {
-
+    try
+    {
+        bool deleted = bll.DeleteRecipe(id, name);
+        if (deleted)
+        {
+            return Results.NoContent(); // Return a 204 No Content response on successful deletion
+        }
+        else
+        {
+            return Results.NotFound("Recipe not found."); // Return a 404 Not Found response with an appropriate message
+        }
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(ex.Message); // Return a 400 Bad Request response with the exception message
+    }
 });
+
 
 #endregion
 
