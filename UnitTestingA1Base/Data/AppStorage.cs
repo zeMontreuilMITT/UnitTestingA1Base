@@ -17,6 +17,7 @@ namespace UnitTestingA1Base.Data
         public HashSet<Ingredient> Ingredients { get; set; }
         public HashSet<IngredientRestriction> IngredientRestrictions { get; set; }  
         public HashSet<RecipeIngredient> RecipeIngredients { get; set; }
+        public HashSet<RecipeSubmission>RecipeSubmissions { get; set; }
         
         public int GeneratePrimaryKey()
         {
