@@ -1,6 +1,7 @@
 #region Setup
 using UnitTestingA1Base.Data;
 using UnitTestingA1Base.Models;
+using static UnitTestingA1Base.Data.BusinessLogicLayer;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -48,16 +49,21 @@ app.MapGet("/recipes/byIngredient", (string? name, int? id) =>
 /// </summary>
 app.MapGet("/recipes/byDiet", (string name, int id) =>
 {
-    try
+    // You can call the business logic layer method to retrieve the recipes
+    var recipes = bll.GetRecipesByDietaryRestriction(name, id);
+
+    if (recipes.Count > 0)
     {
-        HashSet<Recipe> recipes = bll.GetRecipesByDiet(name, id);
-        return recipes.Any() ? Results.Ok(recipes) : Results.NotFound();
+        // Return a 200 OK response with the recipes
+        return Results.Ok(recipes);
     }
-    catch (Exception ex)
+    else
     {
-        return Results.NotFound();
+        // Return a 404 Not Found response if no recipes match the criteria
+        return Results.NotFound("No recipes found for the specified dietary restriction.");
     }
 });
+
 
 ///<summary>
 ///Returns a HashSet of all recipes by either Name or Primary Key. 
@@ -67,13 +73,14 @@ app.MapGet("/recipes", (string name, int id) =>
     try
     {
         HashSet<Recipe> recipes = bll.GetRecipesByNameOrId(name, id);
-        return recipes.Any() ? Results.Ok(recipes) : Results.NotFound();
+        return Results.Ok(recipes);
     }
     catch (Exception ex)
     {
         return Results.NotFound();
     }
 });
+
 
 ///<summary>
 /// Receives a JSON object which should contain a Recipe and Ingredients
@@ -88,27 +95,43 @@ app.MapGet("/recipes", (string name, int id) =>
 /// 
 /// All IDs should be created for these objects using the returned value of the AppStorage.GeneratePrimaryKey() method
 /// </summary>
-// /recipes endpoint
-app.MapGet("/recipes", (string name, int id) =>
+app.MapPost("/recipes", (RecipeInput recipeInput) =>
 {
+    // Validate the input (recipe) and ingredients.
+    if (recipeInput == null || recipeInput.Recipe == null || recipeInput.Ingredients == null)
+    {
+        return Results.BadRequest("Invalid input data.");
+    }
+
+    Recipe newRecipe = recipeInput.Recipe;
+    List<Ingredient> newIngredients = recipeInput.Ingredients;
+
+    // Check if a recipe with the same name already exists.
+    bool recipeExists = bll.DoesRecipeExist(newRecipe.Name);
+
+    if (recipeExists)
+    {
+        return Results.BadRequest("A recipe with the same name already exists.");
+    }
+
+    // Create new recipes and ingredients, and their relationships.
     try
     {
-        HashSet<Recipe> matchingRecipes = bll.GetRecipesByNameOrId(name, id);
-
-        if (matchingRecipes.Count > 0)
+        RecipeInput newRecipeInput = new RecipeInput
         {
-            return Results.Ok(matchingRecipes);
-        }
-        else
-        {
-            return Results.NotFound("No matching recipes found.");
-        }
+            Recipe = newRecipe,
+            Ingredients = newIngredients
+        };
+        bll.AddRecipeAndIngredients(newRecipeInput);
     }
-    catch (Exception ex)
+    catch (InvalidOperationException ex)
     {
-        return Results.NotFound();
+        return Results.BadRequest(ex.Message);
     }
+
+    return Results.Created("/recipes", newRecipe);
 });
+
 
 
 ///<summary>
@@ -118,23 +141,18 @@ app.MapGet("/recipes", (string name, int id) =>
 ///</summary>
 app.MapDelete("/ingredients", (int id, string name) =>
 {
-    try
+    bool isDeleted = bll.DeleteIngredient(id, name);
+    if (isDeleted)
     {
-        bool deleted = bll.DeleteIngredient(id, name);
-        if (deleted)
-        {
-            return Results.NoContent(); // Return a 204 No Content response on successful deletion
-        }
-        else
-        {
-            return Results.NotFound("Ingredient not found."); // Return a 404 Not Found response with an appropriate message
-        }
+        return Results.NoContent(); // Return a 204 No Content response on successful deletion
     }
-    catch (Exception ex)
+    else
     {
-        return Results.BadRequest(ex.Message); // Return a 400 Bad Request response with the exception message
+        return Results.NotFound("Ingredient not found or is used in multiple recipes.");
+        // You can customize the message based on your needs.
     }
 });
+
 
 /// <summary>
 /// Deletes the requested recipe from the database
@@ -142,26 +160,16 @@ app.MapDelete("/ingredients", (int id, string name) =>
 /// </summary>
 app.MapDelete("/recipes", (int id, string name) =>
 {
-    try
+    if (bll.DeleteRecipe(id, name))
     {
-        bool deleted = bll.DeleteRecipe(id, name);
-        if (deleted)
-        {
-            return Results.NoContent(); // Return a 204 No Content response on successful deletion
-        }
-        else
-        {
-            return Results.NotFound("Recipe not found."); // Return a 404 Not Found response with an appropriate message
-        }
+        return Results.NoContent(); // Return a 204 No Content response on successful deletion
     }
-    catch (Exception ex)
+    else
     {
-        return Results.BadRequest(ex.Message); // Return a 400 Bad Request response with the exception message
+        return Results.NotFound("Recipe not found"); // Return a 404 Not Found response with an appropriate message
     }
 });
 
-
 #endregion
-
 
 app.Run();

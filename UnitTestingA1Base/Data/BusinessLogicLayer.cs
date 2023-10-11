@@ -26,7 +26,7 @@ namespace UnitTestingA1Base.Data
             return recipes;
         }
 
-        public HashSet<Recipe> GetRecipesByDiet(string name, int id)
+        public HashSet<Recipe> GetRecipesByDietaryRestriction(string name, int id)
         {
             // Find the dietary restriction based on either name or ID
             DietaryRestriction dietaryRestriction = null;
@@ -41,9 +41,6 @@ namespace UnitTestingA1Base.Data
 
             if (dietaryRestriction == null)
             {
-                // Handle the case when the dietary restriction is not found.
-                // You can throw an exception or return an appropriate response.
-                // For simplicity, I'll return an empty HashSet here.
                 return new HashSet<Recipe>();
             }
 
@@ -85,42 +82,72 @@ namespace UnitTestingA1Base.Data
             return new HashSet<Recipe>();
         }
 
-        public HashSet<Ingredient> GetIngredientsByNameOrId(string name, int id)
+        public class RecipeInput
         {
-            // If an ID is provided, search for the ingredient by ID
-            if (id > 0)
+            public Recipe Recipe { get; set; }
+            public List<Ingredient> Ingredients { get; set; }
+        }
+
+        public void AddRecipeAndIngredients(RecipeInput input)
+        {
+            // Check if a Recipe with the same name already exists
+            if (_appStorage.Recipes.Any(r => r.Name.Equals(input.Recipe.Name, StringComparison.OrdinalIgnoreCase)))
             {
-                var ingredientById = _appStorage.Ingredients.FirstOrDefault(ingredient => ingredient.Id == id);
-                if (ingredientById != null)
+                throw new InvalidOperationException("A recipe with the same name already exists.");
+            }
+
+            // Process and add new Ingredients
+            foreach (var ingredient in input.Ingredients)
+            {
+                // Check if an Ingredient with the same name already exists
+                var existingIngredient = _appStorage.Ingredients.FirstOrDefault(i => i.Name.Equals(ingredient.Name, StringComparison.OrdinalIgnoreCase));
+                if (existingIngredient == null)
                 {
-                    var result = new HashSet<Ingredient> { ingredientById };
-                    return result;
+                    // If the Ingredient is not found, add it to the database
+                    ingredient.Id = _appStorage.GeneratePrimaryKey();
+                    _appStorage.Ingredients.Add(ingredient);
+                }
+                else
+                {
+                    // Use the existing Ingredient's ID
+                    ingredient.Id = existingIngredient.Id;
                 }
             }
 
-            // If a name is provided, search for ingredients by name (case-insensitive)
-            if (!string.IsNullOrEmpty(name))
+            // Generate a new ID for the Recipe
+            input.Recipe.Id = _appStorage.GeneratePrimaryKey();
+
+            // Add the new Recipe to the database
+            _appStorage.Recipes.Add(input.Recipe);
+
+            // Create RecipeIngredient objects and add them to the database
+            foreach (var ingredient in input.Ingredients)
             {
-                var ingredientsByName = _appStorage.Ingredients
-                    .Where(ingredient => ingredient.Name.Contains(name, StringComparison.OrdinalIgnoreCase))
-                    .ToHashSet();
-
-                return ingredientsByName;
+                _appStorage.RecipeIngredients.Add(new RecipeIngredient
+                {
+                    IngredientId = ingredient.Id,
+                    RecipeId = input.Recipe.Id,
+                    Amount = 1.0, // You can set the amount as needed
+                    MeasurementUnit = MeasurementUnit.Grams // You can set the measurement unit as needed
+                });
             }
+        }
 
-            // If neither ID nor name is provided or no matching ingredient is found, return an empty HashSet
-            return new HashSet<Ingredient>();
+        public bool DoesRecipeExist(string recipeName)
+        {
+            // Check if a recipe with the provided name already exists.
+            return _appStorage.Recipes.Any(recipe => recipe.Name.Equals(recipeName, StringComparison.OrdinalIgnoreCase));
         }
 
         public bool DeleteIngredient(int id, string name)
         {
             // Find the ingredient by ID or name
-            Ingredient ingredientToDelete = _appStorage.Ingredients
-                .FirstOrDefault(i => i.Id == id || i.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+            Ingredient ingredientToDelete = _appStorage.Ingredients.FirstOrDefault(i => i.Id == id || i.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
 
             if (ingredientToDelete == null)
             {
-                return false; // Ingredient not found
+                // Ingredient not found
+                return false;
             }
 
             // Check how many recipes use this ingredient
@@ -128,14 +155,34 @@ namespace UnitTestingA1Base.Data
 
             if (recipeCount > 1)
             {
-                return false; // Ingredient is used in multiple recipes and cannot be deleted
+                // Ingredient is used in multiple recipes and cannot be deleted
+                return false;
             }
 
             // Delete the ingredient
             _appStorage.Ingredients.Remove(ingredientToDelete);
+
+            // If there's only one recipe using the ingredient, delete the recipe and associated RecipeIngredients
+            if (recipeCount == 1)
+            {
+                Recipe recipeUsingIngredient = _appStorage.Recipes.FirstOrDefault(r => _appStorage.RecipeIngredients.Any(ri => ri.RecipeId == r.Id && ri.IngredientId == ingredientToDelete.Id));
+
+                if (recipeUsingIngredient != null)
+                {
+                    // Delete associated RecipeIngredients
+                    var recipeIngredientsToDelete = _appStorage.RecipeIngredients.Where(ri => ri.RecipeId == recipeUsingIngredient.Id).ToList();
+                    foreach (var recipeIngredient in recipeIngredientsToDelete)
+                    {
+                        _appStorage.RecipeIngredients.Remove(recipeIngredient);
+                    }
+
+                    // Delete the recipe
+                    _appStorage.Recipes.Remove(recipeUsingIngredient);
+                }
+            }
+
             return true; // Ingredient deleted successfully
         }
-
 
         public bool DeleteRecipe(int id, string name)
         {

@@ -25,6 +25,6 @@ namespace UnitTestingA1Base.Models
     public enum MeasurementUnit
     {
         Grams,
-        Milliliters
+        Milliletres
     }
 }
