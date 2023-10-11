@@ -312,16 +312,6 @@ namespace UnitTestingA1Base.Data
             },
             new IngredientRestriction
             {
-                DietaryRestrictionId = 3,
-                IngredientId = 1
-            },
-            new IngredientRestriction
-            {
-                DietaryRestrictionId = 4,
-                IngredientId = 3
-            },
-            new IngredientRestriction
-            {
                 DietaryRestrictionId = 5,
                 IngredientId = 5
             },
