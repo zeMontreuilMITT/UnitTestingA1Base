@@ -46,17 +46,34 @@ app.MapGet("/recipes/byIngredient", (string? name, int? id) =>
 ///<summary>
 /// Returns a HashSet of all Recipes that only contain ingredients that belong to the Dietary Restriction provided by name or Primary Key
 /// </summary>
-app.MapGet("/recipes/byDiet", (string name, int id) =>
+app.MapGet("/recipes/byDiet", (string? name, int? id) =>
 {
+    try
+    {
+        HashSet<Recipe> recipes = bll.GetRecipesByDietaryRestriction(id, name);
+        return Results.Ok(recipes);
+    }
+    catch (Exception ex)
+    {
+        return Results.NotFound();
+    }
 
 });
 
 ///<summary>
 ///Returns a HashSet of all recipes by either Name or Primary Key. 
 /// </summary>
-app.MapGet("/recipes", (string name, int id) =>
+app.MapGet("/recipes", (string? name, int? id) =>
 {
-
+    try
+    {
+        HashSet<Recipe> recipes = bll.GetRecipesByIdOrName(id, name);
+        return Results.Ok(recipes);
+    }
+    catch (Exception ex)
+    {
+        return Results.NotFound();
+    }
 });
 
 ///<summary>
@@ -81,18 +98,34 @@ app.MapPost("/recipes", () => {
 /// If there is only one Recipe using that Ingredient, then the Recipe is also deleted, as well as all associated RecipeIngredients
 /// If there are multiple Recipes using that ingredient, a Forbidden response code should be provided with an appropriate message
 ///</summary>
-app.MapDelete("/ingredients", (int id, string name) =>
+app.MapDelete("/ingredients", (int? id, string? name) =>
 {
-
+    try
+    {
+        string recipes = bll.DeleteRecipesByDeleteIngredientByIdOrName(id, name);
+        return Results.Ok(recipes);
+    }
+    catch (Exception ex)
+    {
+        return Results.NotFound();
+    }
 });
 
 /// <summary>
 /// Deletes the requested recipe from the database
 /// This should also delete the associated IngredientRecipe objects from the database
 /// </summary>
-app.MapDelete("/recipes", (int id, string name) =>
+app.MapDelete("/recipes", (int? id, string? name) =>
 {
-
+    try
+    {
+        string  recipes = bll.DeleteRecipesByIdOrName(id, name);
+        return Results.Ok(recipes);
+    }
+    catch (Exception ex)
+    {
+        return Results.NotFound();
+    }
 });
 
 #endregion
